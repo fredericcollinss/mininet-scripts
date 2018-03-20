@@ -1,7 +1,15 @@
 #!/usr/bin/python
-from mininet.topo import Topo
 from mininet.net import Mininet
+from mininet.topo import Topo
 from mininet.link import TCLink
+from mininet.cli import CLI
+from mininet.util import quietRun
+from mininet.log import setLogLevel, info
+from mininet.term import makeTerms
+from mininet.examples.nat import connectToInternet, stopNAT
+from time import sleep
+import os
+
 
 class SimpleTopo(Topo):
     "Simple topology"
@@ -34,61 +42,67 @@ option	lease	7  # seconds
 # option dns 8.8.8.8
 # interface h1-eth0
 
-def makeDHCPconfig( filename, intf, gw, dns ):
+
+def makeDHCPconfig(filename, intf, gw, dns):
     "Create a DHCP configuration file"
     config = (
         'interface %s' % intf,
         DNSTemplate,
         'option router %s' % gw,
         'option dns %s' % dns,
-        '' )
-    with open( filename, 'w' ) as f:
-        f.write( '\n'.join( config ) )
+        '')
+    with open(filename, 'w') as f:
+        f.write('\n'.join(config))
 
-def startDHCPserver( host, gw, dns ):
+
+def startDHCPserver(host, gw, dns):
     "Start DHCP server on host with specified DNS server"
-    info( '* Starting DHCP server on', host, 'at', host.IP(), '\n' )
+    info('* Starting DHCP server on', host, 'at', host.IP(), '\n')
     dhcpConfig = '/tmp/%s-udhcpd.conf' % host
-    makeDHCPconfig( dhcpConfig, host.defaultIntf(), gw, dns )
-    host.cmd( 'udhcpd -f', dhcpConfig,
-              '1>/tmp/%s-dhcp.log 2>&1  &' % host )
+    makeDHCPconfig(dhcpConfig, host.defaultIntf(), gw, dns)
+    host.cmd('udhcpd -f', dhcpConfig,
+             '1>/tmp/%s-dhcp.log 2>&1  &' % host)
 
-def stopDHCPserver( host ):
+
+def stopDHCPserver(host):
     "Stop DHCP server on host"
-    info( '* Stopping DHCP server on', host, 'at', host.IP(), '\n' )
-    host.cmd( 'kill %udhcpd' )
+    info('* Stopping DHCP server on', host, 'at', host.IP(), '\n')
+    host.cmd('kill %udhcpd')
 
 
 # DHCP client functions
 
-def startDHCPclient( host ):
+def startDHCPclient(host):
     "Start DHCP client on host"
     intf = host.defaultIntf()
-    host.cmd( 'dhclient -v -d -r', intf )
-    host.cmd( 'dhclient -v -d 1> /tmp/dhclient.log 2>&1', intf, '&' )
+    host.cmd('dhclient -v -d -r', intf)
+    host.cmd('dhclient -v -d 1> /tmp/dhclient.log 2>&1', intf, '&')
 
-def stopDHCPclient( host ):
-    host.cmd( 'kill %dhclient' )
 
-def waitForIP( host ):
+def stopDHCPclient(host):
+    host.cmd('kill %dhclient')
+
+
+def waitForIP(host):
     "Wait for an IP address"
-    info( '*', host, 'waiting for IP address' )
+    info('*', host, 'waiting for IP address')
     while True:
         host.defaultIntf().updateIP()
         if host.IP():
             break
-        info( '.' )
-        sleep( 1 )
-    info( '\n' )
-    info( '*', host, 'is now using',
-          host.cmd( 'grep nameserver /etc/resolv.conf' ) )
+        info('.')
+        sleep(1)
+    info('\n')
+    info('*', host, 'is now using',
+         host.cmd('grep nameserver /etc/resolv.conf'))
 
 
 if __name__ == '__main__':
     topo = SimpleTopo()
-    net = Mininet( topo=topo, link=TCLink )
+    net = Mininet(topo=topo, link=TCLink)
     dhcp, client = net.get('dhcp', 'client')
-    startDHCPclient(dhcp)
+    # connectToInternet calls net.start() for us!
+    rootnode = connectToInternet(net, 's1')
+    startDHCPserver(dhcp, gw=rootnode.IP(), dns='8.8.8.8')
     startDHCPclient(client)
-
-
+    waitForIP(client)
