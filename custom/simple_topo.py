@@ -6,7 +6,6 @@ from mininet.cli import CLI
 from mininet.util import quietRun
 from mininet.log import setLogLevel, info
 from mininet.term import makeTerms
-from mininet.examples.nat import connectToInternet, stopNAT
 from time import sleep
 import os
 
@@ -102,7 +101,6 @@ if __name__ == '__main__':
     net = Mininet(topo=topo, link=TCLink)
     dhcp, client = net.get('dhcp', 'client')
     # connectToInternet calls net.start() for us!
-    rootnode = connectToInternet(net, 's1')
-    startDHCPserver(dhcp, gw=rootnode.IP(), dns='8.8.8.8')
+    startDHCPserver(dhcp, gw='10.0.1.222', dns='8.8.8.8')
     startDHCPclient(client)
     waitForIP(client)
